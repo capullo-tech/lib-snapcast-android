@@ -71,7 +71,7 @@ publishing {
         register<MavenPublication>("release") {
             groupId = "tech.capullo"
             artifactId = "lib-snapcast-android"
-            version = "0.1.0"
+            version = "0.2.0"
 
             afterEvaluate {
                 from(components["release"])

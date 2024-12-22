@@ -19,7 +19,7 @@ publishing {
         create<MavenPublication>("aarPublication") {
             groupId = "tech.capullo"
             artifactId = "snapcast-deps"
-            version = "0.1.0"
+            version = "0.2.0"
 
             // Add each .aar file as an artifact
             artifact(file("libs/oboe-1.9.0.aar")) {
