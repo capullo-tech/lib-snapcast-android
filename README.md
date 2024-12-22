@@ -1,12 +1,6 @@
 # lib_snapcast_android
 
-`lib_snapcast_android` is an Android library module designed to integrate [Snapcast](https://github.com/badaix/snapcast) functionality into your Android applications. This library provides a comprehensive interface for Snapcast, allowing you to easily include audio streaming capabilities in your app.
-
-## Features
-
-- Integration with Snapcast for audio streaming.
-- Supports multiple architecture builds (armeabi-v7a, arm64-v8a, x86, x86_64).
-- Prebuilt dependencies for various audio codecs.
+`lib_snapcast_android` is an Android library module designed to integrate [Snapcast](https://github.com/badaix/snapcast) functionality into your Android applications. This library provides a comprehensive interface for Snapcast, allowing you to easily include audio streaming and synchronized multi device listening capabilities in your app.
 
 ## Installation
 
