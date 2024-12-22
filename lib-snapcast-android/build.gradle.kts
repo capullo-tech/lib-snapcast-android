@@ -1,5 +1,3 @@
-import com.android.build.gradle.internal.registerDependencyCheck
-
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
@@ -59,20 +57,13 @@ android {
 
 dependencies {
 
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.appcompat)
-    implementation(libs.material)
-    implementation("com.github.badaix:oboe:1.9.0@aar")
-    implementation("com.github.badaix:boost:1.85.0@aar")
-    implementation("com.github.badaix:flac:1.4.2@aar")
-    implementation("com.github.badaix:ogg:1.3.5@aar")
-    implementation("com.github.badaix:opus:1.1.2@aar")
-    implementation("com.github.badaix:soxr:0.1.3@aar")
-    implementation("com.github.badaix:tremor:1.0.1@aar")
-    implementation("com.github.badaix:vorbis:1.3.7@aar")
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
+    //implementation(libs.androidx.core.ktx)
+    //implementation(libs.androidx.appcompat)
+    //implementation(libs.material)
+    implementation(project(mapOf("path" to ":snapcast-deps")))
+    //testImplementation(libs.junit)
+    //androidTestImplementation(libs.androidx.junit)
+    //androidTestImplementation(libs.androidx.espresso.core)
 }
 
 publishing {
@@ -84,16 +75,6 @@ publishing {
 
             afterEvaluate {
                 from(components["release"])
-            }
-        }
-    }
-    repositories {
-        maven {
-            name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/capullo-tech/lib-snapcast-android")
-            credentials {
-                username = System.getenv("GITHUB_ACTOR")
-                password = System.getenv("GITHUB_TOKEN")
             }
         }
     }
