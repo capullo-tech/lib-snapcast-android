@@ -3,4 +3,4 @@ jdk:
 before_install:
   - which pkg-config
 env:
-  - PKG_CONFIG_EXECUTABLE: /usr/bin/pkg-config
+  - PKG_CONFIG_EXECUTABLE: "/usr/bin/pkg-config"
