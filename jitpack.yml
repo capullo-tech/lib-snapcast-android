@@ -1,0 +1,6 @@
+jdk:
+  - openjdk17
+before_install:
+  - which pkg-config
+env:
+  - PKG_CONFIG_EXECUTABLE: /usr/bin/pkg-config
