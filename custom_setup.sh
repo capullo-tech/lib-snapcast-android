@@ -1,16 +1,23 @@
 #!/bin/bash
 
-# Update the package list
-apt-get update
+# Set the version to be installed
+PKG_CONFIG_VERSION=0.29.2
 
-# Install pkg-config
-apt-get install -y pkg-config
+# Download and extract pkg-config source code
+wget https://pkg-config.freedesktop.org/releases/pkg-config-$PKG_CONFIG_VERSION.tar.gz
+tar -xzf pkg-config-$PKG_CONFIG_VERSION.tar.gz
+cd pkg-config-$PKG_CONFIG_VERSION
 
-# Find the path to pkg-config
-PKG_CONFIG_PATH=$(which pkg-config)
+# Configure, compile, and install pkg-config to a custom directory
+./configure --prefix=$HOME/pkg-config --with-internal-glib
+make
+make install
 
-# Export the PKG_CONFIG_EXECUTABLE environment variable
-export PKG_CONFIG_EXECUTABLE=$PKG_CONFIG_PATH
+# Set the PKG_CONFIG_EXECUTABLE environment variable
+export PKG_CONFIG_EXECUTABLE=$HOME/pkg-config/bin/pkg-config
+
+# Add pkg-config to the PATH
+export PATH=$HOME/pkg-config/bin:$PATH
 
 # Print the pkg-config path
 echo "PKG_CONFIG_EXECUTABLE is set to $PKG_CONFIG_EXECUTABLE"
