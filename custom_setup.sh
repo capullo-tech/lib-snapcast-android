@@ -27,7 +27,7 @@ LINE_TO_ADD="set(PKG_CONFIG_EXECUTABLE \"$PKG_CONFIG_EXECUTABLE\")"
 
 # Add the line to the end of the CMake file if it doesn't already exist
 # grep -qxF "$LINE_TO_ADD" $CMAKE_FILE || echo "$LINE_TO_ADD" >> $CMAKE_FILE
-sed -i "7a $LINE_TO_ADD" $CMAKE_FILE
+# sed -i "7a $LINE_TO_ADD" $CMAKE_FILE
 
 
 # Print the contents of the CMakeLists.txt file for verification
