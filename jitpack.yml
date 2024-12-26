@@ -2,3 +2,5 @@ jdk:
   - openjdk17
 before_install:
   - ./custom_setup.sh
+env:
+  PKG_CONFIG_EXECUTABLE: "/home/jitpack/pkg-config/bin/pkg-config"
