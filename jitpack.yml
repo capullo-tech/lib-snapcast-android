@@ -2,5 +2,9 @@ jdk:
   - openjdk17
 before_install:
   - ./custom_setup.sh
+install:
+  - export PKG_CONFIG_EXECUTABLE=$HOME/pkg-config/bin/pkg-config
+  - echo $PKG_CONFIG_EXECUTABLE
+  - ./gradlew publishToMavenLocal
 env:
   PKG_CONFIG_EXECUTABLE: "/home/jitpack/pkg-config/bin/pkg-config"
