@@ -23,7 +23,7 @@ echo "PKG_CONFIG_EXECUTABLE is set to $PKG_CONFIG_EXECUTABLE"
 CMAKE_FILE="$HOME/build/lib-snapcast-android/src/main/cpp/snapcast/CMakeLists.txt"
 
 # Line to add to the CMake file
-LINE_TO_ADD='set(PKG_CONFIG_EXECUTABLE "$PKG_CONFIG_EXECUTABLE")'
+LINE_TO_ADD="set(PKG_CONFIG_EXECUTABLE \"$PKG_CONFIG_EXECUTABLE\")"
 
 # Add the line to the end of the CMake file if it doesn't already exist
 grep -qxF "$LINE_TO_ADD" $CMAKE_FILE || echo "$LINE_TO_ADD" >> $CMAKE_FILE
