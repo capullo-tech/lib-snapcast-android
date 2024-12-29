@@ -4,10 +4,6 @@ before_install:
   - ./custom_setup.sh
 install:
   - export PKG_CONFIG_EXECUTABLE=$HOME/pkg-config/bin/pkg-config
-  - echo $PKG_CONFIG_EXECUTABLE
   - export PATH=$HOME/pkg-config/bin:$PATH
-  - echo $PATH
-  - pkg-config --version
+  - ./gradlew clean build
   - ./gradlew publishToMavenLocal
-env:
-  PKG_CONFIG_EXECUTABLE: "/home/jitpack/pkg-config/bin/pkg-config"
