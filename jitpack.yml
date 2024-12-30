@@ -1,0 +1,9 @@
+jdk:
+  - openjdk17
+before_install:
+  - ./pkg_config_setup.sh
+install:
+  - export PKG_CONFIG_EXECUTABLE=$HOME/pkg-config/bin/pkg-config
+  - export PATH=$HOME/pkg-config/bin:$PATH
+  - ./gradlew clean build
+  - ./gradlew publishToMavenLocal
