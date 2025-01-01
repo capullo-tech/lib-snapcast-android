@@ -79,7 +79,7 @@ publishing {
         register<MavenPublication>("release") {
             groupId = "tech.capullo"
             artifactId = "lib-snapcast-android"
-            version = getSnapcastGitTag()
+            version = "0.29.0"
 
             afterEvaluate {
                 from(components["release"])
