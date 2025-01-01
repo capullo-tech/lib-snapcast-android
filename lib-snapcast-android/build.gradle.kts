@@ -66,12 +66,20 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
 }
 
+fun getSnapcastGitTag(): String =
+    ProcessBuilder("git", "describe", "--tags")
+        .directory(file("${rootDir}/lib-snapcast-android/src/main/cpp/snapcast"))
+        .start()
+        .inputStream
+        .bufferedReader().readText().trim()
+        .removePrefix("v")
+
 publishing {
     publications {
         register<MavenPublication>("release") {
             groupId = "tech.capullo"
             artifactId = "lib-snapcast-android"
-            version = "0.2.0"
+            version = getSnapcastGitTag()
 
             afterEvaluate {
                 from(components["release"])
