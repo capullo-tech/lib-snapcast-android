@@ -52,9 +52,11 @@ Add the package dependencies to your module's `build.gradle` file:
 
 ```groovy
 dependencies {
-    implementation 'com.github.capullo-tech.lib-snapcast-android:lib-snapcast-android:0.29.0'
+    implementation 'com.github.capullo-tech:lib-snapcast-android:main-SNAPSHOT'
 }
 ```
+
+Build number references: https://jitpack.io/#capullo-tech/lib-snapcast-android
 
 ## Usage
 
