@@ -1,4 +1,4 @@
-# lib_snapcast_android
+# About
 
 Android library module designed to integrate [Snapcast](https://github.com/badaix/snapcast) functionality into your Android applications. 
 
@@ -10,9 +10,9 @@ This project includes the original Snapcast project [as a git submodule](./.gitm
 
 You can add the library to your project using either GitHub Packages or JitPack. 
 
-Add the following to your project's root `build.gradle` file:
-
 #### Option 1: GitHub Packages repository
+
+Add the following to your project's root `build.gradle` file:
 
 ```groovy
 repositories {
@@ -39,6 +39,8 @@ dependencies {
 
 #### Option 2: JitPack repository
 
+Add the following to your project's root `build.gradle` file:
+
 ```groovy
 repositories {
     ...
@@ -52,7 +54,7 @@ Add the package dependencies to your module's `build.gradle` file:
 
 ```groovy
 dependencies {
-    implementation 'com.github.capullo-tech:lib-snapcast-android:main-SNAPSHOT'
+    implementation 'com.github.capullo-tech.lib-snapcast-android:lib-snapcast-android:main-SNAPSHOT'
 }
 ```
 
