@@ -14,12 +14,20 @@ artifacts.add("default", file("libs/soxr-0.1.3.aar"))
 artifacts.add("default", file("libs/tremor-1.0.1.aar"))
 artifacts.add("default", file("libs/vorbis-1.3.7.aar"))
 
+fun getSnapcastGitTag(): String =
+    ProcessBuilder("git", "describe", "--tags")
+        .directory(file("${rootDir}/lib-snapcast-android/src/main/cpp/snapcast"))
+        .start()
+        .inputStream
+        .bufferedReader().readText().trim()
+        .removePrefix("v")
+
 publishing {
     publications {
         create<MavenPublication>("aarPublication") {
             groupId = "tech.capullo"
             artifactId = "snapcast-deps"
-            version = "0.2.0"
+            version = "0.29.0"
 
             // Add each .aar file as an artifact
             artifact(file("libs/oboe-1.9.0.aar")) {

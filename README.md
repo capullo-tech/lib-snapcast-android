@@ -1,18 +1,32 @@
 # lib_snapcast_android
 
-`lib_snapcast_android` is an Android library module designed to integrate [Snapcast](https://github.com/badaix/snapcast) functionality into your Android applications. This library provides a comprehensive interface for Snapcast, allowing you to easily include audio streaming and synchronized multi device listening capabilities in your app.
+Android library module designed to integrate [Snapcast](https://github.com/badaix/snapcast) functionality into your Android applications. 
+
+This project includes the original Snapcast project [as a git submodule](./.gitmodules), compiles it using the Android NDK, and packages it.
 
 ## Installation
 
-To include the `lib_snapcast_android` library in your Android project, you need to add the GitHub Packages repository and the dependency to your project’s `build.gradle` files. Please refer to the Github documentation for more information on [authenticating to GitHub Packages](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-gradle-registry#using-a-published-package).
+### Add the Dependency
 
-### Step 1: Configure the GitHub Packages Repository
+Add the package dependencies to your module's `build.gradle` file:
 
-Add the following to your project's root `build.gradle` file (Gradle Groovy) or `build.gradle.kts` file (Kotlin DSL) file.to include the GitHub Packages repository:
+```groovy
+dependencies {
+    implementation 'tech.capullo:lib_snapcast_android:0.29.0'
+}
+```
 
-Example using Gradle Groovy:
+### Add the Repository
+
+You can add the library to your project using either GitHub Packages or JitPack. 
+
+Add the following to your project's root `build.gradle` file:
+
+#### Option 1: GitHub Packages repository
+
 ```groovy
 repositories {
+    ...
     maven {
         url = uri("https://maven.pkg.github.com/capullo-tech/lib-snapcast-android")
         credentials {
@@ -23,55 +37,75 @@ repositories {
 }
 ```
 
-Example using Kotlin DSL:
-```kotlin
-repositories {
-    maven {
-        setUrl("https://maven.pkg.github.com/capullo-tech/lib-snapcast-android")
-        credentials {
-            username = project.findProperty("gpr.user") ?: System.getenv("GITHUB_USERNAME")
-            password = project.findProperty("gpr.key") ?: System.getenv("GITHUB_TOKEN")
-        }
-    }
-}
-```
+Please refer to the Github documentation for more information on [authenticating to GitHub Packages](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-gradle-registry#using-a-published-package).
 
-### Step 2: Add the Dependency
+#### Option 2: JitPack repository
 
-Add the package dependencies to your module's `build.gradle` file (Gradle Groovy) or `build.gradle.kts` file (Kotlin DSL) file.
-
-Example using Gradle Groovy:
 ```groovy
-dependencies {
-    implementation 'tech.capullo:lib_snapcast_android:0.2.0'
+repositories {
+    ...
+    maven {
+        url = uri("https://jitpack.io")
+   }
 }
 ```
 
-Example using Kotlin DSL:
+## Usage
+
+Both the `snapcast` and `snapserver` binaries are included in the library as [shared objects](https://developer.android.com/ndk/guides/abis#native-code-in-app-packages).
+
 ```kotlin
-dependencies {
-    implementation("tech.capullo:lib_snapcast_android:0.2.0")
-}
+val nativeLibraryDir = applicationContext.applicationInfo.nativeLibraryDir
 ```
 
-### Step 3: Configure Authentication
+You can then start either the `snapcast` or `snapserver` binary using the `ProcessBuilder` class:
 
-You need to provide authentication for GitHub Packages. This can be done either by setting environment variables or by using a gradle.properties file.
+```kotlin
+// snapclient
 
-#### Using Environment Variables
+val androidPlayer = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) "opensl" else "oboe"
 
-Set the following environment variables:
-```sh
-export GITHUB_USERNAME=<your-github-username>
-export GITHUB_TOKEN=<your-github-token>
+val audioManager = applicationContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+val rate: String? = audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)
+val fpb: String? = audioManager.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)
+
+val sampleformat = "$rate:16:*"
+
+val pb = ProcessBuilder()
+    .command(
+        "$nativeLibraryDir/libsnapclient.so",
+        "--player", androidPlayer,
+        "--sampleformat", sampleformat,
+        "-h", "your.snapserver.com",
+        "-p", "1704"
+    )
+    .redirectErrorStream(true)
+
+val env = pb.environment()
+if (rate != null) env["SAMPLE_RATE"] = rate
+if (fpb != null) env["FRAMES_PER_BUFFER"] = fpb
+
+val snapclientProcess = pb.start()
+
+// manage the running process
+...
 ```
 
-#### Using Gradle Properties
+```kotlin
+// snapserver
+val cacheDir = applicationContext.cacheDir
+val pb = ProcessBuilder()
+    .command(
+        "$nativeLibraryDir/libsnapserver.so",
+        "--server.datadir=$cacheDir",
+        "--stream.source", "tcp://... OR pipe://... OR) // possible stream source configuration: https://github.com/badaix/snapcast#server
+    )
+    .redirectErrorStream(true)
 
-Add the following to your gradle.properties file:
-```properties
-gpr.user=<your-github-username>
-gpr.token=<your-github-token>
+val snapserverProcess = pb.start()
+
+// manage the running process
+...
 ```
 
 ### Acknowledgements
