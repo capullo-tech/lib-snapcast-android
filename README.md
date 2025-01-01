@@ -8,16 +8,6 @@ This project includes the original Snapcast project [as a git submodule](./.gitm
 
 ### Add the Dependency
 
-Add the package dependencies to your module's `build.gradle` file:
-
-```groovy
-dependencies {
-    implementation 'tech.capullo:lib_snapcast_android:0.29.0'
-}
-```
-
-### Add the Repository
-
 You can add the library to your project using either GitHub Packages or JitPack. 
 
 Add the following to your project's root `build.gradle` file:
@@ -39,6 +29,14 @@ repositories {
 
 Please refer to the Github documentation for more information on [authenticating to GitHub Packages](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-gradle-registry#using-a-published-package).
 
+Add the package dependencies to your module's `build.gradle` file:
+
+```groovy
+dependencies {
+    implementation 'tech.capullo:lib-snapcast-android:0.29.0'
+}
+```
+
 #### Option 2: JitPack repository
 
 ```groovy
@@ -47,6 +45,14 @@ repositories {
     maven {
         url = uri("https://jitpack.io")
    }
+}
+```
+
+Add the package dependencies to your module's `build.gradle` file:
+
+```groovy
+dependencies {
+    implementation 'com.github.capullo-tech.lib-snapcast-android:lib-snapcast-android:0.29.0'
 }
 ```
 
