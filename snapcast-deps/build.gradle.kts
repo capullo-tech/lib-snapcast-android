@@ -13,6 +13,7 @@ artifacts.add("default", file("libs/opus-1.1.2.aar"))
 artifacts.add("default", file("libs/soxr-0.1.3.aar"))
 artifacts.add("default", file("libs/tremor-1.0.1.aar"))
 artifacts.add("default", file("libs/vorbis-1.3.7.aar"))
+artifacts.add("default", file("libs/openssl-3.2.0.aar"))
 
 fun getSnapcastGitTag(): String =
     ProcessBuilder("git", "describe", "--tags")
@@ -61,6 +62,10 @@ publishing {
             artifact(file("libs/vorbis-1.3.7.aar")) {
                 extension = "aar"
                 classifier = "vorbis"
+            }
+            artifact(file("libs/openssl-3.2.0.aar")) {
+                extension = "aar"
+                classifier = "openssl"
             }
         }
     }
