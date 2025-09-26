@@ -118,5 +118,21 @@ val snapserverProcess = pb.start()
 ...
 ```
 
+## Building
+
+Clone this repo with git clone --recurse-submodules or do git submodule update --init --recursive immediately after cloning to initialize the [Snapcast submodule](./.gitmodules)
+
+Run:
+
+```shell
+$ ./gradlew build
+```
+
+For local development:
+
+```shell
+$ ./gradlew publishToMavenLocal
+```
+
 ### Acknowledgements
 - [Snapcast](https://github.com/badaix/snapcast)
