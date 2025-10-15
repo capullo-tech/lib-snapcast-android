@@ -72,6 +72,7 @@ You can then start either the `snapcast` or `snapserver` binary using the `Proce
 
 ```kotlin
 // snapclient
+// man pages: https://github.com/badaix/snapcast/blob/master/client/snapclient.1
 
 val androidPlayer = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) "opensl" else "oboe"
 
@@ -86,8 +87,7 @@ val pb = ProcessBuilder()
         "$nativeLibraryDir/libsnapclient.so",
         "--player", androidPlayer,
         "--sampleformat", sampleformat,
-        "-h", "your.snapserver.com",
-        "-p", "1704"
+        "<tcp|ws|wss>://<snapserver host or IP or mDNS service name>[:port]" // For example: 'tcp://192.168.1.1:1704', or 'ws://homeserver.local' or 'wss://_snapcast-https._tcp'
     )
     .redirectErrorStream(true)
 
@@ -103,10 +103,15 @@ val snapclientProcess = pb.start()
 
 ```kotlin
 // snapserver
+// man pages: https://github.com/badaix/snapcast/blob/master/server/snapserver.1
+
 val cacheDir = applicationContext.cacheDir
+val confFile = File(cacheDir, "snapserver.conf")
+
 val pb = ProcessBuilder()
     .command(
         "$nativeLibraryDir/libsnapserver.so",
+        "--config", confFile.absolutePath,
         "--server.datadir=$cacheDir",
         "--stream.source", "tcp://... OR pipe://... OR) // possible stream source configuration: https://github.com/badaix/snapcast#server
     )
@@ -136,3 +141,4 @@ $ ./gradlew publishToMavenLocal
 
 ### Acknowledgements
 - [Snapcast](https://github.com/badaix/snapcast)
+- [Snapdroid](https://github.com/badaix/snapdroid)
