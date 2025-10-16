@@ -1,4 +1,4 @@
 [submodule "lib-snapcast-android/src/main/cpp/snapcast"]
 	path = lib-snapcast-android/src/main/cpp/snapcast
 	url = https://github.com/capullo-tech/snapcast.git
-	branch = lr_android_ssl
+	branch = lr_snapcast_v0.34.0_16kb
