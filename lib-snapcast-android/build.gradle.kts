@@ -9,7 +9,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        minSdk = 23
+        minSdk = 17
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
@@ -17,7 +17,8 @@ android {
             cmake {
                 arguments += listOf("-DANDROID_STL=c++_static", "-DBUILD_SERVER=ON", "-DBUILD_TESTS=OFF")
                 cppFlags += listOf("-std=c++14")
-                abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+                abiFilters += listOf("arm64-v8a")
+                //abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
             }
         }
     }
@@ -47,7 +48,7 @@ android {
     buildFeatures {
         prefab = true
     }
-    ndkVersion = "25.1.8937393"
+    ndkVersion = "23.2.8568313"
     packaging {
         jniLibs {
             useLegacyPackaging = true
@@ -57,13 +58,13 @@ android {
 
 dependencies {
 
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.appcompat)
-    implementation(libs.material)
+    //implementation(libs.androidx.core.ktx)
+    //implementation(libs.androidx.appcompat)
+    //implementation(libs.material)
     implementation(project(mapOf("path" to ":snapcast-deps")))
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
+    //testImplementation(libs.junit)
+    //androidTestImplementation(libs.androidx.junit)
+    //androidTestImplementation(libs.androidx.espresso.core)
 }
 
 fun getSnapcastGitTag(): String =
@@ -79,7 +80,7 @@ publishing {
         register<MavenPublication>("release") {
             groupId = "tech.capullo"
             artifactId = "lib-snapcast-android"
-            version = "0.34.0"
+            version = "0.65.0"
 
             afterEvaluate {
                 from(components["release"])
