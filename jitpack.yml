@@ -5,5 +5,4 @@ before_install:
 install:
   - export PKG_CONFIG_EXECUTABLE=$HOME/pkg-config/bin/pkg-config
   - export PATH=$HOME/pkg-config/bin:$PATH
-  - ./gradlew clean build
-  - ./gradlew publishToMavenLocal
+  - ./gradlew :snapcast-deps:publishToMavenLocal :lib-snapcast-android:publishToMavenLocal
