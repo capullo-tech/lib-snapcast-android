@@ -18,7 +18,18 @@ static int connectAbstract(const std::string& name) {
 }
 
 int main(int argc, char** argv) {
-    std::string socketName = "snapcontrol"; // override via --socket-name=...
+    std::string socketName = "snapcontrol"; // default; override via --socket-name=<name>
+
+    // snapserver forwards controlscriptparams into argv (alongside --stream=,
+    // --snapcast-port=, --snapcast-host=). Scan for our flag; ignore the rest.
+    const std::string kSocketNameFlag = "--socket-name=";
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg.rfind(kSocketNameFlag, 0) == 0) { // arg starts with the flag
+            socketName = arg.substr(kSocketNameFlag.size());
+            break;
+        }
+    }
 
     int sock = connectAbstract(socketName);
     if (sock < 0) {
