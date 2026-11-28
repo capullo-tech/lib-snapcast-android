@@ -37,6 +37,7 @@ android {
     buildFeatures {
         compose = true
     }
+    ndkVersion = "25.1.8937393"
     packaging {
         jniLibs {
             useLegacyPackaging = true

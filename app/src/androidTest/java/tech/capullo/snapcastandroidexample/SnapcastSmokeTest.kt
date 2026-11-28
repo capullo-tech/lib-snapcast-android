@@ -100,44 +100,45 @@ class SnapcastSmokeTest {
     fun snapcontrolBridgesAbstractUnixSocket() {
         val socketName = "snapcast-smoke-${UUID.randomUUID().toString().take(8)}"
         val executor = Executors.newSingleThreadExecutor()
+        // LocalServerSocket only implements Closeable from API 28, so close it explicitly.
+        val serverSocket = LocalServerSocket(socketName)
         try {
-            LocalServerSocket(socketName).use { serverSocket ->
-                val serverFuture = executor.submit<String> {
-                    serverSocket.accept().use { client ->
-                        val reader = BufferedReader(InputStreamReader(client.inputStream))
-                        val writer = BufferedWriter(OutputStreamWriter(client.outputStream))
-                        val received = reader.readLine()
-                        writer.write("""{"jsonrpc":"2.0","id":1,"result":"pong"}""")
-                        writer.newLine()
-                        writer.flush()
-                        received
-                    }
+            val serverFuture = executor.submit<String> {
+                serverSocket.accept().use { client ->
+                    val reader = BufferedReader(InputStreamReader(client.inputStream))
+                    val writer = BufferedWriter(OutputStreamWriter(client.outputStream))
+                    val received = reader.readLine()
+                    writer.write("""{"jsonrpc":"2.0","id":1,"result":"pong"}""")
+                    writer.newLine()
+                    writer.flush()
+                    received
                 }
-
-                val process = startProcess(
-                    File(nativeLibDir, "libsnapcontrol.so").absolutePath,
-                    "--socket-name=$socketName",
-                )
-
-                val procWriter = BufferedWriter(OutputStreamWriter(process.outputStream))
-                val procReader = BufferedReader(InputStreamReader(process.inputStream))
-
-                val outbound = """{"jsonrpc":"2.0","id":1,"method":"ping"}"""
-                procWriter.write(outbound)
-                procWriter.newLine()
-                procWriter.flush()
-
-                val reply = procReader.readLine()
-                assertEquals("""{"jsonrpc":"2.0","id":1,"result":"pong"}""", reply)
-
-                val receivedByServer = serverFuture.get(5, TimeUnit.SECONDS)
-                assertEquals(outbound, receivedByServer)
-
-                procWriter.close()
-                assertTrue("libsnapcontrol.so did not exit in time", process.waitForSeconds(5))
-                assertEquals(0, process.exitValue())
             }
+
+            val process = startProcess(
+                File(nativeLibDir, "libsnapcontrol.so").absolutePath,
+                "--socket-name=$socketName",
+            )
+
+            val procWriter = BufferedWriter(OutputStreamWriter(process.outputStream))
+            val procReader = BufferedReader(InputStreamReader(process.inputStream))
+
+            val outbound = """{"jsonrpc":"2.0","id":1,"method":"ping"}"""
+            procWriter.write(outbound)
+            procWriter.newLine()
+            procWriter.flush()
+
+            val reply = procReader.readLine()
+            assertEquals("""{"jsonrpc":"2.0","id":1,"result":"pong"}""", reply)
+
+            val receivedByServer = serverFuture.get(5, TimeUnit.SECONDS)
+            assertEquals(outbound, receivedByServer)
+
+            procWriter.close()
+            assertTrue("libsnapcontrol.so did not exit in time", process.waitForSeconds(5))
+            assertEquals(0, process.exitValue())
         } finally {
+            serverSocket.close()
             executor.shutdownNow()
         }
     }
