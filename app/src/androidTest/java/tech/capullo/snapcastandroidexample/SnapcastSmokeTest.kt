@@ -16,6 +16,7 @@ import org.junit.runner.RunWith
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.File
+import java.io.IOException
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
@@ -224,47 +225,64 @@ class SnapcastSmokeTest {
             )
             drainAsync(clientProcess, clientLogs)
 
+            // Evaluate each condition before building its message: the message embeds the logs,
+            // and Kotlin evaluates arguments left to right.
+            val listening = waitForChannelListener(clientProcess, 10)
             assertTrue(
-                "OboePlayer did not start channel control listener:\n$clientLogs",
-                waitForLog(clientLogs, "Channel control listening on @snapclient_channel", clientProcess),
+                "OboePlayer did not start channel control listener:\n${snapshot(clientLogs)}",
+                listening,
             )
-            assertTrue(
-                "OboePlayer did not finish init:\n$clientLogs",
-                waitForLog(clientLogs, "Init done", clientProcess),
-            )
-            val initLogs = synchronized(clientLogs) { clientLogs.toString() }
+            val initDone = waitForLog(clientLogs, "Init done", clientProcess)
+            assertTrue("OboePlayer did not finish init:\n${snapshot(clientLogs)}", initDone)
+            val initLogs = snapshot(clientLogs)
             assertTrue(
                 "OboePlayer failed to build AudioStream:\n$initLogs",
                 !initLogs.contains("Error building AudioStream"),
             )
 
-            assertTrue(
-                "OboePlayer did not switch channel to left:\n$clientLogs",
-                switchChannel("left", 1, clientLogs, clientProcess),
-            )
+            val switchedLeft = switchChannel("left", 1, clientLogs, clientProcess)
+            assertTrue("OboePlayer did not switch channel to left:\n${snapshot(clientLogs)}", switchedLeft)
 
-            assertTrue(
-                "OboePlayer did not switch channel to right:\n$clientLogs",
-                switchChannel("right", 2, clientLogs, clientProcess),
-            )
+            val switchedRight = switchChannel("right", 2, clientLogs, clientProcess)
+            assertTrue("OboePlayer did not switch channel to right:\n${snapshot(clientLogs)}", switchedRight)
 
-            assertTrue(
-                "OboePlayer did not switch channel back to stereo:\n$clientLogs",
-                switchChannel("stereo", 0, clientLogs, clientProcess),
-            )
+            val switchedStereo = switchChannel("stereo", 0, clientLogs, clientProcess)
+            assertTrue("OboePlayer did not switch channel back to stereo:\n${snapshot(clientLogs)}", switchedStereo)
         } finally {
             dataDir.deleteRecursively()
         }
     }
 
+    // Lines logged by snapclient's channel-control thread are not reliable evidence: AixLog keeps
+    // the current severity and condition process-wide, so a DEBUG or rate-limited log on another
+    // thread (main-thread init logs, the audio thread's "Failed to get chunk") can make it drop a
+    // concurrent INFO line. strace confirms the commands themselves always arrive. Hence the
+    // listener is probed directly, and channel switches are resent until their log line appears.
+
+    /** Waits until something accepts connections on @snapclient_channel. */
+    private fun waitForChannelListener(process: Process, timeoutSeconds: Long): Boolean {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds)
+        while (System.nanoTime() < deadline) {
+            if (!process.isRunning()) return false
+            try {
+                // An empty connection is ignored by the listener (it only acts on n > 0 bytes).
+                LocalSocket().use { socket ->
+                    socket.connect(
+                        LocalSocketAddress("snapclient_channel", LocalSocketAddress.Namespace.ABSTRACT),
+                    )
+                }
+                return true
+            } catch (_: IOException) {
+                Thread.sleep(100)
+            }
+        }
+        return false
+    }
+
     /**
-     * Sends [mode] until snapclient logs that the channel is now [expectedIndex].
-     *
-     * The command itself is not lost, but its log line can be: AixLog keeps severity and
-     * condition state process-wide, so the audio thread's rate-limited DEBUG "Failed to get chunk"
-     * log (no audio is fed in this test) can make it drop a concurrent INFO line from the
-     * channel-control thread. Commands are idempotent, and the match is on the resulting state
-     * ("→ 1 (left)"), not the transition, so a resend still proves the listener applies them.
+     * Sends [mode] until snapclient logs that the channel is now [expectedIndex]. Commands are
+     * idempotent and the match is on the resulting state ("→ 1 (left)"), not the transition, so a
+     * resend after a dropped log line still proves the listener applies them.
      */
     private fun switchChannel(
         mode: String,
@@ -288,6 +306,8 @@ class SnapcastSmokeTest {
             socket.outputStream.flush()
         }
     }
+
+    private fun snapshot(sink: StringBuilder): String = synchronized(sink) { sink.toString() }
 
     private fun waitForLog(
         sink: StringBuilder,
