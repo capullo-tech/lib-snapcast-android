@@ -3,6 +3,7 @@ package tech.capullo.snapcastandroidexample
 import android.net.LocalServerSocket
 import android.net.LocalSocket
 import android.net.LocalSocketAddress
+import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.json.JSONObject
@@ -15,6 +16,8 @@ import org.junit.runner.RunWith
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.File
+import java.io.IOException
+import java.io.InputStream
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.InetAddress
@@ -39,11 +42,11 @@ class SnapcastSmokeTest {
     @After
     fun tearDown() {
         spawnedProcesses.forEach { process ->
-            if (process.isAlive) {
+            if (process.isRunning()) {
                 process.destroy()
-                if (!process.waitFor(2, TimeUnit.SECONDS)) {
-                    process.destroyForcibly()
-                    process.waitFor(2, TimeUnit.SECONDS)
+                if (!process.waitForSeconds(2)) {
+                    process.forceKill()
+                    process.waitForSeconds(2)
                 }
             }
         }
@@ -99,44 +102,48 @@ class SnapcastSmokeTest {
     fun snapcontrolBridgesAbstractUnixSocket() {
         val socketName = "snapcast-smoke-${UUID.randomUUID().toString().take(8)}"
         val executor = Executors.newSingleThreadExecutor()
+        // LocalServerSocket only implements Closeable from API 28, so close it explicitly.
+        val serverSocket = LocalServerSocket(socketName)
         try {
-            LocalServerSocket(socketName).use { serverSocket ->
-                val serverFuture = executor.submit<String> {
-                    serverSocket.accept().use { client ->
-                        val reader = BufferedReader(InputStreamReader(client.inputStream))
-                        val writer = BufferedWriter(OutputStreamWriter(client.outputStream))
-                        val received = reader.readLine()
-                        writer.write("""{"jsonrpc":"2.0","id":1,"result":"pong"}""")
-                        writer.newLine()
-                        writer.flush()
-                        received
-                    }
+            val serverFuture = executor.submit<String> {
+                serverSocket.accept().use { client ->
+                    val reader = BufferedReader(InputStreamReader(client.inputStream))
+                    val writer = BufferedWriter(OutputStreamWriter(client.outputStream))
+                    val received = reader.readLine()
+                    writer.write("""{"jsonrpc":"2.0","id":1,"result":"pong"}""")
+                    writer.newLine()
+                    writer.flush()
+                    received
                 }
-
-                val process = startProcess(
-                    File(nativeLibDir, "libsnapcontrol.so").absolutePath,
-                    "--socket-name=$socketName",
-                )
-
-                val procWriter = BufferedWriter(OutputStreamWriter(process.outputStream))
-                val procReader = BufferedReader(InputStreamReader(process.inputStream))
-
-                val outbound = """{"jsonrpc":"2.0","id":1,"method":"ping"}"""
-                procWriter.write(outbound)
-                procWriter.newLine()
-                procWriter.flush()
-
-                val reply = procReader.readLine()
-                assertEquals("""{"jsonrpc":"2.0","id":1,"result":"pong"}""", reply)
-
-                val receivedByServer = serverFuture.get(5, TimeUnit.SECONDS)
-                assertEquals(outbound, receivedByServer)
-
-                procWriter.close()
-                assertTrue("libsnapcontrol.so did not exit in time", process.waitFor(5, TimeUnit.SECONDS))
-                assertEquals(0, process.exitValue())
             }
+
+            // Keep stderr apart: stdout carries the bridged JSON-RPC, and the pre-O (API < 26)
+            // linker writes "unsupported flags DT_FLAGS_1" warnings for PIE binaries to stderr.
+            val process = startProcessWithSeparateStderr(
+                File(nativeLibDir, "libsnapcontrol.so").absolutePath,
+                "--socket-name=$socketName",
+            )
+            drainAsync(process.errorStream, StringBuilder())
+
+            val procWriter = BufferedWriter(OutputStreamWriter(process.outputStream))
+            val procReader = BufferedReader(InputStreamReader(process.inputStream))
+
+            val outbound = """{"jsonrpc":"2.0","id":1,"method":"ping"}"""
+            procWriter.write(outbound)
+            procWriter.newLine()
+            procWriter.flush()
+
+            val reply = procReader.readLine()
+            assertEquals("""{"jsonrpc":"2.0","id":1,"result":"pong"}""", reply)
+
+            val receivedByServer = serverFuture.get(5, TimeUnit.SECONDS)
+            assertEquals(outbound, receivedByServer)
+
+            procWriter.close()
+            assertTrue("libsnapcontrol.so did not exit in time", process.waitForSeconds(5))
+            assertEquals(0, process.exitValue())
         } finally {
+            serverSocket.close()
             executor.shutdownNow()
         }
     }
@@ -218,40 +225,75 @@ class SnapcastSmokeTest {
             )
             drainAsync(clientProcess, clientLogs)
 
+            // Evaluate each condition before building its message: the message embeds the logs,
+            // and Kotlin evaluates arguments left to right.
+            val listening = waitForChannelListener(clientProcess, 10)
             assertTrue(
-                "OboePlayer did not start channel control listener:\n$clientLogs",
-                waitForLog(clientLogs, "Channel control listening on @snapclient_channel", clientProcess),
+                "OboePlayer did not start channel control listener:\n${snapshot(clientLogs)}",
+                listening,
             )
-            assertTrue(
-                "OboePlayer did not finish init:\n$clientLogs",
-                waitForLog(clientLogs, "Init done", clientProcess),
-            )
-            val initLogs = synchronized(clientLogs) { clientLogs.toString() }
+            val initDone = waitForLog(clientLogs, "Init done", clientProcess)
+            assertTrue("OboePlayer did not finish init:\n${snapshot(clientLogs)}", initDone)
+            val initLogs = snapshot(clientLogs)
             assertTrue(
                 "OboePlayer failed to build AudioStream:\n$initLogs",
                 !initLogs.contains("Error building AudioStream"),
             )
 
-            sendChannelCommand("left")
-            assertTrue(
-                "OboePlayer did not switch channel to left:\n$clientLogs",
-                waitForLog(clientLogs, "Channel: 0 → 1 (left)", clientProcess),
-            )
+            val switchedLeft = switchChannel("left", 1, clientLogs, clientProcess)
+            assertTrue("OboePlayer did not switch channel to left:\n${snapshot(clientLogs)}", switchedLeft)
 
-            sendChannelCommand("right")
-            assertTrue(
-                "OboePlayer did not switch channel to right:\n$clientLogs",
-                waitForLog(clientLogs, "Channel: 1 → 2 (right)", clientProcess),
-            )
+            val switchedRight = switchChannel("right", 2, clientLogs, clientProcess)
+            assertTrue("OboePlayer did not switch channel to right:\n${snapshot(clientLogs)}", switchedRight)
 
-            sendChannelCommand("stereo")
-            assertTrue(
-                "OboePlayer did not switch channel back to stereo:\n$clientLogs",
-                waitForLog(clientLogs, "Channel: 2 → 0 (stereo)", clientProcess),
-            )
+            val switchedStereo = switchChannel("stereo", 0, clientLogs, clientProcess)
+            assertTrue("OboePlayer did not switch channel back to stereo:\n${snapshot(clientLogs)}", switchedStereo)
         } finally {
             dataDir.deleteRecursively()
         }
+    }
+
+    // The channel listener is probed directly, and switches are resent until their log line
+    // appears, so the test does not depend on any single log line. Before capullo-tech/snapcast#5,
+    // AixLog kept severity and condition process-wide and regularly dropped this thread's lines
+    // (the commands themselves always arrived); the checks stay robust to that.
+
+    /** Waits until something accepts connections on @snapclient_channel. */
+    private fun waitForChannelListener(process: Process, timeoutSeconds: Long): Boolean {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds)
+        while (System.nanoTime() < deadline) {
+            if (!process.isRunning()) return false
+            try {
+                // An empty connection is ignored by the listener (it only acts on n > 0 bytes).
+                LocalSocket().use { socket ->
+                    socket.connect(
+                        LocalSocketAddress("snapclient_channel", LocalSocketAddress.Namespace.ABSTRACT),
+                    )
+                }
+                return true
+            } catch (_: IOException) {
+                Thread.sleep(100)
+            }
+        }
+        return false
+    }
+
+    /**
+     * Sends [mode] until snapclient logs that the channel is now [expectedIndex]. Commands are
+     * idempotent and the match is on the resulting state ("→ 1 (left)"), not the transition, so a
+     * resend after a dropped log line still proves the listener applies them.
+     */
+    private fun switchChannel(
+        mode: String,
+        expectedIndex: Int,
+        clientLogs: StringBuilder,
+        clientProcess: Process,
+    ): Boolean {
+        repeat(3) {
+            sendChannelCommand(mode)
+            if (waitForLog(clientLogs, "→ $expectedIndex ($mode)", clientProcess, 3)) return true
+        }
+        return false
     }
 
     private fun sendChannelCommand(mode: String) {
@@ -264,6 +306,8 @@ class SnapcastSmokeTest {
         }
     }
 
+    private fun snapshot(sink: StringBuilder): String = synchronized(sink) { sink.toString() }
+
     private fun waitForLog(
         sink: StringBuilder,
         needle: String,
@@ -274,7 +318,7 @@ class SnapcastSmokeTest {
         while (System.nanoTime() < deadline) {
             val found = synchronized(sink) { sink.contains(needle) }
             if (found) return true
-            if (!process.isAlive) return false
+            if (!process.isRunning()) return false
             Thread.sleep(100)
         }
         return false
@@ -420,7 +464,7 @@ class SnapcastSmokeTest {
     ): Boolean {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
         while (System.nanoTime() < deadline) {
-            if (!serverProcess.isAlive || !clientProcess.isAlive) {
+            if (!serverProcess.isRunning() || !clientProcess.isRunning()) {
                 return false
             }
             if (pcmOutputFile.exists() && pcmOutputFile.length() > 0 && hasNonZeroBytes(pcmOutputFile)) {
@@ -452,7 +496,7 @@ class SnapcastSmokeTest {
     ) {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
         while (System.nanoTime() < deadline) {
-            if (!serverProcess.isAlive) {
+            if (!serverProcess.isRunning()) {
                 throw AssertionError(
                     "libsnapserver.so exited early with code ${serverProcess.exitValue()}:\n$serverLogs",
                 )
@@ -478,7 +522,7 @@ class SnapcastSmokeTest {
     ): Boolean {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15)
         while (System.nanoTime() < deadline) {
-            if (!serverProcess.isAlive || !clientProcess.isAlive) {
+            if (!serverProcess.isRunning() || !clientProcess.isRunning()) {
                 return false
             }
             try {
@@ -526,10 +570,18 @@ class SnapcastSmokeTest {
         }
     }
 
-    private fun startProcess(vararg command: String): Process {
-        val process = ProcessBuilder(*command)
-            .redirectErrorStream(true)
-            .start()
+    // No default arguments on these vararg helpers: Android 6.0's x86_64 dex2oat miscompiled the
+    // synthetic `$default` bridge (null array, "Attempt to get length of null array"). The test APK
+    // is also interpreted there now (vmSafeMode, see androidTest/AndroidManifest.xml).
+
+    private fun startProcess(vararg command: String): Process =
+        track(ProcessBuilder(*command).redirectErrorStream(true).start())
+
+    /** Like [startProcess], but stderr stays separate ([Process.getErrorStream]). */
+    private fun startProcessWithSeparateStderr(vararg command: String): Process =
+        track(ProcessBuilder(*command).start())
+
+    private fun track(process: Process): Process {
         spawnedProcesses.add(process)
         return process
     }
@@ -538,19 +590,22 @@ class SnapcastSmokeTest {
         val process = startProcess(*command)
         val output = StringBuilder()
         val readerThread = drainAsync(process, output)
-        val finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS)
+        val finished = process.waitForSeconds(timeoutSeconds)
         if (!finished) {
-            process.destroyForcibly()
+            process.forceKill()
             throw AssertionError("Process timed out (${command.joinToString(" ")}):\n$output")
         }
         readerThread.join(2000)
         return ProcessResult(process.exitValue(), output.toString())
     }
 
-    private fun drainAsync(process: Process, sink: StringBuilder): Thread {
+    private fun drainAsync(process: Process, sink: StringBuilder): Thread =
+        drainAsync(process.inputStream, sink)
+
+    private fun drainAsync(stream: InputStream, sink: StringBuilder): Thread {
         return Thread {
             try {
-                BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
+                BufferedReader(InputStreamReader(stream)).use { reader ->
                     var line = reader.readLine()
                     while (line != null) {
                         synchronized(sink) {
@@ -569,4 +624,27 @@ class SnapcastSmokeTest {
     }
 
     private data class ProcessResult(val exitCode: Int, val output: String)
+}
+
+// Process.isAlive(), waitFor(long, TimeUnit) and destroyForcibly() only exist from API 26.
+// These helpers keep the smoke test runnable down to minSdk 23.
+
+private fun Process.isRunning(): Boolean = try {
+    exitValue()
+    false
+} catch (_: IllegalThreadStateException) {
+    true
+}
+
+private fun Process.waitForSeconds(timeoutSeconds: Long): Boolean {
+    val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds)
+    while (isRunning()) {
+        if (System.nanoTime() >= deadline) return false
+        Thread.sleep(50)
+    }
+    return true
+}
+
+private fun Process.forceKill() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) destroyForcibly() else destroy()
 }
