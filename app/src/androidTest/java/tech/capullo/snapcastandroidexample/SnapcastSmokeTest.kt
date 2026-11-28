@@ -16,6 +16,7 @@ import org.junit.runner.RunWith
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.File
+import java.io.InputStream
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.InetAddress
@@ -115,10 +116,14 @@ class SnapcastSmokeTest {
                 }
             }
 
+            // Keep stderr apart: stdout carries the bridged JSON-RPC, and the pre-O (API < 26)
+            // linker writes "unsupported flags DT_FLAGS_1" warnings for PIE binaries to stderr.
             val process = startProcess(
                 File(nativeLibDir, "libsnapcontrol.so").absolutePath,
                 "--socket-name=$socketName",
+                mergeStderr = false,
             )
+            drainAsync(process, StringBuilder(), process.errorStream)
 
             val procWriter = BufferedWriter(OutputStreamWriter(process.outputStream))
             val procReader = BufferedReader(InputStreamReader(process.inputStream))
@@ -528,9 +533,9 @@ class SnapcastSmokeTest {
         }
     }
 
-    private fun startProcess(vararg command: String): Process {
+    private fun startProcess(vararg command: String, mergeStderr: Boolean = true): Process {
         val process = ProcessBuilder(*command)
-            .redirectErrorStream(true)
+            .redirectErrorStream(mergeStderr)
             .start()
         spawnedProcesses.add(process)
         return process
@@ -549,10 +554,14 @@ class SnapcastSmokeTest {
         return ProcessResult(process.exitValue(), output.toString())
     }
 
-    private fun drainAsync(process: Process, sink: StringBuilder): Thread {
+    private fun drainAsync(
+        process: Process,
+        sink: StringBuilder,
+        stream: InputStream = process.inputStream,
+    ): Thread {
         return Thread {
             try {
-                BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
+                BufferedReader(InputStreamReader(stream)).use { reader ->
                     var line = reader.readLine()
                     while (line != null) {
                         synchronized(sink) {
