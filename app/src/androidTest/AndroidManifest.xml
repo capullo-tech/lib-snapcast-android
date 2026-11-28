@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+        Applies to the test APK only. On Android 6.0 (API 23) x86_64 the dex2oat optimizing
+        compiler miscompiles parts of the smoke test (null vararg arrays, SIGSEGV inside the
+        compiled test method). vmSafeMode makes installd compile this APK with the
+        interpret-only filter on that release; newer releases are unaffected.
+    -->
+    <application android:vmSafeMode="true" />
+
+</manifest>

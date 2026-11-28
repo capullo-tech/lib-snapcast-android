@@ -118,12 +118,11 @@ class SnapcastSmokeTest {
 
             // Keep stderr apart: stdout carries the bridged JSON-RPC, and the pre-O (API < 26)
             // linker writes "unsupported flags DT_FLAGS_1" warnings for PIE binaries to stderr.
-            val process = startProcess(
+            val process = startProcessWithSeparateStderr(
                 File(nativeLibDir, "libsnapcontrol.so").absolutePath,
                 "--socket-name=$socketName",
-                mergeStderr = false,
             )
-            drainAsync(process, StringBuilder(), process.errorStream)
+            drainAsync(process.errorStream, StringBuilder())
 
             val procWriter = BufferedWriter(OutputStreamWriter(process.outputStream))
             val procReader = BufferedReader(InputStreamReader(process.inputStream))
@@ -239,26 +238,45 @@ class SnapcastSmokeTest {
                 !initLogs.contains("Error building AudioStream"),
             )
 
-            sendChannelCommand("left")
             assertTrue(
                 "OboePlayer did not switch channel to left:\n$clientLogs",
-                waitForLog(clientLogs, "Channel: 0 → 1 (left)", clientProcess),
+                switchChannel("left", 1, clientLogs, clientProcess),
             )
 
-            sendChannelCommand("right")
             assertTrue(
                 "OboePlayer did not switch channel to right:\n$clientLogs",
-                waitForLog(clientLogs, "Channel: 1 → 2 (right)", clientProcess),
+                switchChannel("right", 2, clientLogs, clientProcess),
             )
 
-            sendChannelCommand("stereo")
             assertTrue(
                 "OboePlayer did not switch channel back to stereo:\n$clientLogs",
-                waitForLog(clientLogs, "Channel: 2 → 0 (stereo)", clientProcess),
+                switchChannel("stereo", 0, clientLogs, clientProcess),
             )
         } finally {
             dataDir.deleteRecursively()
         }
+    }
+
+    /**
+     * Sends [mode] until snapclient logs that the channel is now [expectedIndex].
+     *
+     * The command itself is not lost, but its log line can be: AixLog keeps severity and
+     * condition state process-wide, so the audio thread's rate-limited DEBUG "Failed to get chunk"
+     * log (no audio is fed in this test) can make it drop a concurrent INFO line from the
+     * channel-control thread. Commands are idempotent, and the match is on the resulting state
+     * ("→ 1 (left)"), not the transition, so a resend still proves the listener applies them.
+     */
+    private fun switchChannel(
+        mode: String,
+        expectedIndex: Int,
+        clientLogs: StringBuilder,
+        clientProcess: Process,
+    ): Boolean {
+        repeat(3) {
+            sendChannelCommand(mode)
+            if (waitForLog(clientLogs, "→ $expectedIndex ($mode)", clientProcess, 3)) return true
+        }
+        return false
     }
 
     private fun sendChannelCommand(mode: String) {
@@ -533,10 +551,18 @@ class SnapcastSmokeTest {
         }
     }
 
-    private fun startProcess(vararg command: String, mergeStderr: Boolean = true): Process {
-        val process = ProcessBuilder(*command)
-            .redirectErrorStream(mergeStderr)
-            .start()
+    // No default arguments on these vararg helpers: Android 6.0's x86_64 dex2oat miscompiled the
+    // synthetic `$default` bridge (null array, "Attempt to get length of null array"). The test APK
+    // is also interpreted there now (vmSafeMode, see androidTest/AndroidManifest.xml).
+
+    private fun startProcess(vararg command: String): Process =
+        track(ProcessBuilder(*command).redirectErrorStream(true).start())
+
+    /** Like [startProcess], but stderr stays separate ([Process.getErrorStream]). */
+    private fun startProcessWithSeparateStderr(vararg command: String): Process =
+        track(ProcessBuilder(*command).start())
+
+    private fun track(process: Process): Process {
         spawnedProcesses.add(process)
         return process
     }
@@ -554,11 +580,10 @@ class SnapcastSmokeTest {
         return ProcessResult(process.exitValue(), output.toString())
     }
 
-    private fun drainAsync(
-        process: Process,
-        sink: StringBuilder,
-        stream: InputStream = process.inputStream,
-    ): Thread {
+    private fun drainAsync(process: Process, sink: StringBuilder): Thread =
+        drainAsync(process.inputStream, sink)
+
+    private fun drainAsync(stream: InputStream, sink: StringBuilder): Thread {
         return Thread {
             try {
                 BufferedReader(InputStreamReader(stream)).use { reader ->
