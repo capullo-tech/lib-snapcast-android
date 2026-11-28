@@ -3,6 +3,7 @@ package tech.capullo.snapcastandroidexample
 import android.net.LocalServerSocket
 import android.net.LocalSocket
 import android.net.LocalSocketAddress
+import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.json.JSONObject
@@ -39,11 +40,11 @@ class SnapcastSmokeTest {
     @After
     fun tearDown() {
         spawnedProcesses.forEach { process ->
-            if (process.isAlive) {
+            if (process.isRunning()) {
                 process.destroy()
-                if (!process.waitFor(2, TimeUnit.SECONDS)) {
-                    process.destroyForcibly()
-                    process.waitFor(2, TimeUnit.SECONDS)
+                if (!process.waitForSeconds(2)) {
+                    process.forceKill()
+                    process.waitForSeconds(2)
                 }
             }
         }
@@ -133,7 +134,7 @@ class SnapcastSmokeTest {
                 assertEquals(outbound, receivedByServer)
 
                 procWriter.close()
-                assertTrue("libsnapcontrol.so did not exit in time", process.waitFor(5, TimeUnit.SECONDS))
+                assertTrue("libsnapcontrol.so did not exit in time", process.waitForSeconds(5))
                 assertEquals(0, process.exitValue())
             }
         } finally {
@@ -274,7 +275,7 @@ class SnapcastSmokeTest {
         while (System.nanoTime() < deadline) {
             val found = synchronized(sink) { sink.contains(needle) }
             if (found) return true
-            if (!process.isAlive) return false
+            if (!process.isRunning()) return false
             Thread.sleep(100)
         }
         return false
@@ -420,7 +421,7 @@ class SnapcastSmokeTest {
     ): Boolean {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
         while (System.nanoTime() < deadline) {
-            if (!serverProcess.isAlive || !clientProcess.isAlive) {
+            if (!serverProcess.isRunning() || !clientProcess.isRunning()) {
                 return false
             }
             if (pcmOutputFile.exists() && pcmOutputFile.length() > 0 && hasNonZeroBytes(pcmOutputFile)) {
@@ -452,7 +453,7 @@ class SnapcastSmokeTest {
     ) {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
         while (System.nanoTime() < deadline) {
-            if (!serverProcess.isAlive) {
+            if (!serverProcess.isRunning()) {
                 throw AssertionError(
                     "libsnapserver.so exited early with code ${serverProcess.exitValue()}:\n$serverLogs",
                 )
@@ -478,7 +479,7 @@ class SnapcastSmokeTest {
     ): Boolean {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15)
         while (System.nanoTime() < deadline) {
-            if (!serverProcess.isAlive || !clientProcess.isAlive) {
+            if (!serverProcess.isRunning() || !clientProcess.isRunning()) {
                 return false
             }
             try {
@@ -538,9 +539,9 @@ class SnapcastSmokeTest {
         val process = startProcess(*command)
         val output = StringBuilder()
         val readerThread = drainAsync(process, output)
-        val finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS)
+        val finished = process.waitForSeconds(timeoutSeconds)
         if (!finished) {
-            process.destroyForcibly()
+            process.forceKill()
             throw AssertionError("Process timed out (${command.joinToString(" ")}):\n$output")
         }
         readerThread.join(2000)
@@ -569,4 +570,27 @@ class SnapcastSmokeTest {
     }
 
     private data class ProcessResult(val exitCode: Int, val output: String)
+}
+
+// Process.isAlive(), waitFor(long, TimeUnit) and destroyForcibly() only exist from API 26.
+// These helpers keep the smoke test runnable down to minSdk 23.
+
+private fun Process.isRunning(): Boolean = try {
+    exitValue()
+    false
+} catch (_: IllegalThreadStateException) {
+    true
+}
+
+private fun Process.waitForSeconds(timeoutSeconds: Long): Boolean {
+    val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds)
+    while (isRunning()) {
+        if (System.nanoTime() >= deadline) return false
+        Thread.sleep(50)
+    }
+    return true
+}
+
+private fun Process.forceKill() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) destroyForcibly() else destroy()
 }

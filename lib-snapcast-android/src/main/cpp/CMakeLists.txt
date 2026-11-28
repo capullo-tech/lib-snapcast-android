@@ -4,6 +4,10 @@ project(lib_snapcast_android LANGUAGES CXX)
 
 add_subdirectory(snapcast)
 
+# x86/x86_64 on API 26-28: let snapclient survive the app seccomp filter trapping legacy
+# syscalls made by system libraries it loads (see the file header). No-op on other ABIs.
+target_sources(libsnapclient.so PRIVATE seccomp_compat/legacy_syscall_shim.cpp)
+
 add_executable(snapcontrol snapcontrol/main.cpp)
 
 set_target_properties(snapcontrol PROPERTIES
