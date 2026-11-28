@@ -1,7 +1,7 @@
 jdk:
   - openjdk17
 before_install:
-  - git submodule update --init --recursive
+  - 'echo "DIAG pre: $(git submodule status)"; T0=$(date +%s%N); git submodule update --init --recursive; T1=$(date +%s%N); echo "DIAG submodule_update_ms=$(( (T1-T0)/1000000 )) git_modules=$(du -sk .git/modules | cut -f1)KB commits=$(git -C lib-snapcast-android/src/main/cpp/snapcast rev-list --count HEAD) git=$(git --version)"'
   - ./pkg_config_setup.sh
 install:
   - export PKG_CONFIG_EXECUTABLE=$HOME/pkg-config/bin/pkg-config
