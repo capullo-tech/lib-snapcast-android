@@ -253,11 +253,10 @@ class SnapcastSmokeTest {
         }
     }
 
-    // Lines logged by snapclient's channel-control thread are not reliable evidence: AixLog keeps
-    // the current severity and condition process-wide, so a DEBUG or rate-limited log on another
-    // thread (main-thread init logs, the audio thread's "Failed to get chunk") can make it drop a
-    // concurrent INFO line. strace confirms the commands themselves always arrive. Hence the
-    // listener is probed directly, and channel switches are resent until their log line appears.
+    // The channel listener is probed directly, and switches are resent until their log line
+    // appears, so the test does not depend on any single log line. Before capullo-tech/snapcast#5,
+    // AixLog kept severity and condition process-wide and regularly dropped this thread's lines
+    // (the commands themselves always arrived); the checks stay robust to that.
 
     /** Waits until something accepts connections on @snapclient_channel. */
     private fun waitForChannelListener(process: Process, timeoutSeconds: Long): Boolean {
